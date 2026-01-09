@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>JOUST DASHBOARD</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="dashboard-body">
+    <h1>JOUST SERVER</h1>
+    <div id="game-info">
+        <h2 id="speed-display">Velocità: 1.0x</h2>
+        <div id="active-players"></div>
+    </div>
+
+    <audio id="bg-music" loop>
+        <source src="assets/sounds/bach.mp3" type="audio/mpeg">
+    </audio>
+
+    <button id="start-game-btn">INIZIA PARTITA (Attiva Musica)</button>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+        const music = document.getElementById('bg-music');
+        const speedDisplay = document.getElementById('speed-display');
+        const startBtn = document.getElementById('start-game-btn');
+
+        const slowSettings = {
+            text: "❄️ LENTO... IMMOBILE!",
+            color: "#000044"
+        };
+        const fastSettings = {
+            text: "🔥 VELOCE! ATTACCA!",
+            color: "#440000"
+        };
+
+        speedDisplay.innerText = slowSettings.text;
+        document.body.style.backgroundColor = slowSettings.color;
+
+        startBtn.onclick = () => {
+            music.play();
+            startBtn.style.display = 'none';
+        };
+
+        // socket.on('speed_update', (data) => {
+        //     // Cambia la velocità della musica in tempo reale!
+        //     music.playbackRate = data.speed;
+        //     speedDisplay.innerText = `Velocità: ${data.speed.toFixed(2)}x (Soglia: ${data.threshold.toFixed(2)})`;
+            
+        // });
+        socket.on('speed_update', (data) => {
+            music.playbackRate = data.speed;
+            speedDisplay.innerText = data.speed > 1 ? fastSettings.text : slowSettings.text;
+            
+            // Cambia colore alla dashboard per feedback visivo immediato
+            document.body.style.backgroundColor = data.speed > 1 ? fastSettings.color : slowSettings.color;
+        });
+
+        socket.on('update_player_list', (players) => {
+            const container = document.getElementById('active-players');
+            container.innerHTML = Object.values(players)
+                .map(p => `<div class="${p.status}">${p.name} - ${p.status}</div>`)
+                .join('');
+        });
+    </script>
+</body>
+</html>
