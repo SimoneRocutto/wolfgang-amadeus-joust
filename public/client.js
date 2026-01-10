@@ -10,7 +10,7 @@ const joinBtn = document.getElementById('join-btn');
 const lobbyPlayerList = document.getElementById('lobby-player-list');
 const gamePlayerList = document.getElementById('game-player-list');
 
-const deathSound = new Audio('assets/sounds/glass_break.mp3');
+const deathSound = new Audio('assets/sounds/sfx/glass_break.mp3');
 
 let wakeLock = null;
 requestWakeLock();
@@ -23,7 +23,7 @@ joinBtn.addEventListener('click', () => {
 
     // UNLOCK AUDIO: On mobile devices, audio must be first enabled by the user
     deathSound.play().then(() => {
-        deathSound.pause(); // Lo facciamo partire e subito in pausa
+        deathSound.pause();
         deathSound.currentTime = 0;
     }).catch(e => console.log("Audio waiting for interaction"));
 
@@ -66,7 +66,7 @@ socket.on('game_over', () => {
     if (!isAlive) return;
 
     setUI(true)
-    deathSound.play();
+    playDeathSfx()
     window.removeEventListener('devicemotion', handleMotion);
 
     if (window.navigator.vibrate) {
@@ -75,6 +75,7 @@ socket.on('game_over', () => {
 });
 
 socket.on('winner_announced', () => {
+    clearTimeout(toLobbyTimeout)
     toLobbyTimeout = setTimeout(() => {
         gameScreen.classList.add('hidden');
         document.body.classList.remove('dead', 'alive');
@@ -124,4 +125,12 @@ async function requestWakeLock() {
     } catch (err) {
         console.error(`${err.name}, ${err.message}`);
     }
-};
+}
+
+// Stopping in case someone dies, enters lobby and dies again within
+// 3s (mostly me while testing)
+function playDeathSfx() {
+    deathSound.pause();
+    deathSound.currentTime = 0;
+    deathSound.play();
+}

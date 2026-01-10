@@ -1,5 +1,4 @@
 const socket = io();
-const music = document.getElementById("bg-music");
 const header = document.getElementById("header");
 const startBtn = document.getElementById("start-game-btn");
 const toLobbyBtn = document.getElementById("to-lobby-btn");
@@ -7,6 +6,9 @@ const winnerBox = document.getElementById("winner-box");
 const winnerDiv = document.getElementById("winner");
 const lobbyPlayerList = document.getElementById("lobby-players");
 const gamePlayerList = document.getElementById("active-players");
+
+const speedDownSfx = new Audio('/assets/sounds/sfx/speed_down.mp3');
+const speedUpSfx = new Audio('/assets/sounds/sfx/speed_up.mp3');
 
 const initialSpeed = 0
 
@@ -23,13 +25,22 @@ const fastSettings = {
     class: "fast-music"
 };
 
+let music;
+
 setUI(lobbySettings)
 
 window.addEventListener('load', () => {
+    // Get players data
     socket.emit('dashboard_load')
 })
 
 startBtn.onclick = () => {
+    const randomIndex = Math.floor(Math.random() * playlist.length);
+    const selectedSong = playlist[randomIndex];
+
+    music = new Audio(`/assets/sounds/background_music/${selectedSong}`);
+    music.type = 'audio/mpeg';
+
     music.play();
     startBtn.classList.add("hidden");
     socket.emit('start_game');
@@ -47,8 +58,10 @@ socket.on("speed_update", (data) => {
     music.playbackRate = data.speed;
     if (data.speed > 1) {
         setUI(fastSettings)
+        speedUpSfx.play()
     } else {
         setUI(slowSettings)
+        speedDownSfx.play()
     }
 });
 
