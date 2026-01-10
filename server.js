@@ -36,6 +36,7 @@ io.on('connection', (socket) => {
 
     // Dashboard logic
     socket.on('start_game', () => {
+        console.log("Game start!")
         io.emit('start_game')
         initGame()
     })

@@ -12,15 +12,15 @@ const initialSpeed = 0
 
 const lobbySettings = {
     text: "Lobby",
-    color: "#004400",
+    class: "lobby"
 };
 const slowSettings = {
     text: "❄️ SLOW... DON'T MOVE!",
-    color: "#000044",
+    class: "slow-music"
 };
 const fastSettings = {
     text: "🔥 FAST! ATTACK!",
-    color: "#440000",
+    class: "fast-music"
 };
 
 setUI(lobbySettings)
@@ -40,6 +40,7 @@ toLobbyBtn.onclick = () => {
     startBtn.classList.remove("hidden");
     toLobbyBtn.classList.add("hidden");
     setUI(lobbySettings)
+    socket.emit('dashboard_load')
 };
 
 socket.on("speed_update", (data) => {
@@ -52,7 +53,7 @@ socket.on("speed_update", (data) => {
 });
 
 socket.on("update_player_list", ({ lobbyPlayers, gamePlayers }) => {
-    updatePlayersList(lobbyPlayerList, lobbyPlayers)
+    updatePlayersList(lobbyPlayerList, lobbyPlayers, false)
     updatePlayersList(gamePlayerList, gamePlayers)
 });
 
@@ -74,18 +75,20 @@ let qrcode = new QRCode(document.getElementById("qrcode"), {
 
 function setUI(settings) {
     header.innerText = settings.text
-    document.body.style.backgroundColor = settings.color
+    // document.body.style.backgroundColor = settings.color
+    document.body.classList.remove("lobby", "slow-music", "fast-music", "winner")
+    document.body.classList.add(settings.class)
 }
 
-function updatePlayersList(listHTML, players) {
+function updatePlayersList(listHTML, players, showStatus = true) {
     listHTML.innerHTML = players
-        .map((p) => `<div class="${p.status}">${p.name} - ${p.status}</div>`)
+        .map((p) => `<div class="player-item ${p.status}">${p.name}</div>`)
         .join("");
 }
 
 function getWinnerSettings(winnerName) {
     return {
         text: `Game is over! Winner is: ${winnerName}`,
-        color: "#118811",
+        class: "winner"
     };
 }

@@ -38,6 +38,7 @@ function joinLobby(name) {
 }
 
 function startGame(name) {
+    lobbyScreen.classList.add('hidden');
     loginScreen.classList.add('hidden');
     gameScreen.classList.remove('hidden');
     setUI(false)
@@ -85,13 +86,14 @@ document.addEventListener('visibilitychange', async () => {
     }
 });
 
+// Player list on client page has been removed in favor of simpler UI
 function updatePlayersList(listHTML, players) {
-    listHTML.innerHTML = '';
-    players.forEach(p => {
-        const li = document.createElement('li');
-        li.innerHTML = `<span>${p.name}</span> <span class="status-${p.status}">${p.status.toUpperCase()}</span>`;
-        listHTML.appendChild(li);
-    });
+    // listHTML.innerHTML = '';
+    // players.forEach(p => {
+    //     const li = document.createElement('li');
+    //     li.innerHTML = `<span>${p.name}</span> <span class="status-${p.status}">${p.status.toUpperCase()}</span>`;
+    //     listHTML.appendChild(li);
+    // });
 }
 
 function setUI(isDead) {
