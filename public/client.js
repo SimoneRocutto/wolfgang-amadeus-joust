@@ -12,6 +12,9 @@ const gamePlayerList = document.getElementById('game-player-list');
 
 const deathSound = new Audio('assets/sounds/glass_break.mp3');
 
+let wakeLock = null;
+requestWakeLock();
+
 let isAlive = true;
 
 joinBtn.addEventListener('click', () => {
@@ -76,6 +79,12 @@ socket.on('update_player_list', ({ lobbyPlayers, gamePlayers }) => {
     updatePlayersList(gamePlayerList, gamePlayers)
 });
 
+document.addEventListener('visibilitychange', async () => {
+    if (wakeLock !== null && document.visibilityState === 'visible') {
+        await requestWakeLock();
+    }
+});
+
 function updatePlayersList(listHTML, players) {
     listHTML.innerHTML = '';
     players.forEach(p => {
@@ -93,3 +102,16 @@ function setUI(isDead) {
     document.body.classList.remove(classToRemove);
     statusDiv.innerText = isDead ? "YOU'RE DEAD!" : "ALIVE";
 }
+
+async function requestWakeLock() {
+    try {
+        wakeLock = await navigator.wakeLock.request('screen');
+        console.log('Wake Lock is active!');
+
+        wakeLock.addEventListener('release', () => {
+            console.log('Wake Lock was released');
+        });
+    } catch (err) {
+        console.error(`${err.name}, ${err.message}`);
+    }
+};
