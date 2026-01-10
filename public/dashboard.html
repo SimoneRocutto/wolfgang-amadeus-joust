@@ -94,6 +94,20 @@
         text-align: center;
         padding-bottom: 20px;
         border-bottom: 4px solid #4e54c8;
+        transition: border-color 0.6s ease;
+      }
+
+      /* Dynamic header line colors based on game state */
+      body.fast-music #header {
+        border-bottom-color: #fc4a1a;
+      }
+
+      body.slow-music #header {
+        border-bottom-color: #00c9ff;
+      }
+
+      body.winner #header {
+        border-bottom-color: #f7971e;
       }
 
       #active-players,
