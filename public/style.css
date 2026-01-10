@@ -84,3 +84,17 @@ body.lobby {
   color: #ff8181;
   text-decoration: line-through;
 }
+
+// Utility
+.flex {
+  display: flex;
+}
+.flex-center {
+  justify-items: center;
+}
+.mt-2 {
+  margin-top: 0.5rem;
+}
+.mt-8 {
+  margin-top: 2rem;
+}

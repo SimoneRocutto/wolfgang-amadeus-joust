@@ -63,6 +63,15 @@ socket.on("winner_announced", (data) => {
     toLobbyBtn.classList.remove("hidden")
 });
 
+let qrcode = new QRCode(document.getElementById("qrcode"), {
+    text: `${window.location.protocol}//${window.location.host}`,
+    width: 128,
+    height: 128,
+    colorDark: "#000000",
+    colorLight: "#ffffff",
+    correctLevel: QRCode.CorrectLevel.H
+});
+
 function setUI(settings) {
     header.innerText = settings.text
     document.body.style.backgroundColor = settings.color
