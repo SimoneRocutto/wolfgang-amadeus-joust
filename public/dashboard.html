@@ -5,10 +5,11 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body class="dashboard-body">
-    <h1>JOUST SERVER</h1>
+    <h1>WOLFGANG AMADEUS JOUST</h1>
     <div id="game-info">
-      <h2 id="speed-display">Speed: 1.0x</h2>
+      <h2 id="header"></h2>
       <div id="active-players"></div>
+      <div id="lobby-players"></div>
     </div>
 
     <audio id="bg-music" loop>
@@ -16,6 +17,7 @@
     </audio>
 
     <button id="start-game-btn">Start game</button>
+    <button id="to-lobby-btn" class="hidden">Back to lobby</button>
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="dashboard.js"></script>

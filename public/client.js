@@ -1,12 +1,14 @@
 const socket = io();
 
 const loginScreen = document.getElementById('login-screen');
+const lobbyScreen = document.getElementById('lobby-screen');
 const gameScreen = document.getElementById('game-screen');
 const statusDiv = document.getElementById('status-indicator');
 const debugDiv = document.getElementById('debug-info');
 const userInp = document.getElementById('username');
 const joinBtn = document.getElementById('join-btn');
-const playerList = document.getElementById('player-list');
+const lobbyPlayerList = document.getElementById('lobby-player-list');
+const gamePlayerList = document.getElementById('game-player-list');
 
 const deathSound = new Audio('assets/sounds/glass_break.mp3');
 
@@ -21,14 +23,21 @@ joinBtn.addEventListener('click', () => {
         deathSound.currentTime = 0;
     }).catch(e => console.log("Audio waiting for interaction"));
 
-    startGame(name);
+    // Todo: add "shake to enter" => we make sure no player can enter unless they prove they
+    // can die during the game
+    joinLobby(name);
 });
+
+function joinLobby(name) {
+    loginScreen.classList.add('hidden');
+    lobbyScreen.classList.remove('hidden');
+    socket.emit('join_lobby', { name: name });
+}
 
 function startGame(name) {
     loginScreen.classList.add('hidden');
     gameScreen.classList.remove('hidden');
-    document.body.classList.add('alive');
-    socket.emit('join_game', { name: name });
+    setUI(false)
     window.addEventListener('devicemotion', handleMotion);
 }
 
@@ -43,25 +52,44 @@ function handleMotion(event) {
     socket.emit('motion_data', { intensity: intensity });
 }
 
+socket.on('start_game', () => {
+    startGame()
+})
+
 socket.on('game_over', () => {
     if (!isAlive) return;
 
-    isAlive = false;
-    document.body.className = 'dead';
-    statusDiv.innerText = "YOU'RE DEAD!";
+    setUI(true)
 
     deathSound.play();
+
+    window.removeEventListener('devicemotion', handleMotion);
 
     if (window.navigator.vibrate) {
         window.navigator.vibrate([200, 100, 200]); // Vibra-Pausa-Vibra
     }
 });
 
-socket.on('update_player_list', (players) => {
-    playerList.innerHTML = '';
-    Object.values(players).forEach(p => {
-        const li = document.createElement('li');
-        li.innerHTML = `<span>${p.name}</span> <span class="${p.status === 'alive' ? 'status-alive' : 'status-dead'}">${p.status.toUpperCase()}</span>`;
-        playerList.appendChild(li);
-    });
+socket.on('update_player_list', ({ lobbyPlayers, gamePlayers }) => {
+    console.log(lobbyPlayers)
+    updatePlayersList(lobbyPlayerList, lobbyPlayers)
+    updatePlayersList(gamePlayerList, gamePlayers)
 });
+
+function updatePlayersList(listHTML, players) {
+    listHTML.innerHTML = '';
+    players.forEach(p => {
+        const li = document.createElement('li');
+        li.innerHTML = `<span>${p.name}</span> <span class="status-${p.status}">${p.status.toUpperCase()}</span>`;
+        listHTML.appendChild(li);
+    });
+}
+
+function setUI(isDead) {
+    isAlive = !isDead;
+    classToAdd = isDead ? 'dead' : 'alive'
+    classToRemove = isDead ? 'alive' : 'dead'
+    document.body.classList.add(classToAdd);
+    document.body.classList.remove(classToRemove);
+    statusDiv.innerText = isDead ? "YOU'RE DEAD!" : "ALIVE";
+}

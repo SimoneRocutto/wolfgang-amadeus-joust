@@ -12,10 +12,14 @@
       <input
         type="text"
         id="username"
-        placeholder="Nome Giocatore"
+        placeholder="Player Name"
         maxlength="10"
       />
       <button id="join-btn">JOIN GAME</button>
+    </div>
+
+    <div id="lobby-screen" class="hidden">
+      <h1>In Lobby</h1>
     </div>
 
     <div id="game-screen" class="hidden">
@@ -23,9 +27,14 @@
       <div id="debug-info">G: 0.0</div>
     </div>
 
-    <div id="dashboard">
+    <div id="game-dashboard">
       <h3>In game players:</h3>
-      <ul id="player-list"></ul>
+      <ul id="game-player-list"></ul>
+    </div>
+
+    <div id="lobby-dashboard">
+      <h3>In lobby players:</h3>
+      <ul id="lobby-player-list"></ul>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>

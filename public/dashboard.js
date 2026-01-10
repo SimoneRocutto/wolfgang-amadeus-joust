@@ -1,8 +1,19 @@
 const socket = io();
 const music = document.getElementById("bg-music");
-const speedDisplay = document.getElementById("speed-display");
+const header = document.getElementById("header");
 const startBtn = document.getElementById("start-game-btn");
+const toLobbyBtn = document.getElementById("to-lobby-btn");
+const winnerBox = document.getElementById("winner-box");
+const winnerDiv = document.getElementById("winner");
+const lobbyPlayerList = document.getElementById("lobby-players");
+const gamePlayerList = document.getElementById("active-players");
 
+const initialSpeed = 0
+
+const lobbySettings = {
+    text: "Lobby",
+    color: "#004400",
+};
 const slowSettings = {
     text: "❄️ SLOW... DON'T MOVE!",
     color: "#000044",
@@ -12,26 +23,60 @@ const fastSettings = {
     color: "#440000",
 };
 
-speedDisplay.innerText = slowSettings.text;
-document.body.style.backgroundColor = slowSettings.color;
+setUI(lobbySettings)
+
+window.addEventListener('load', () => {
+    socket.emit('dashboard_load')
+})
 
 startBtn.onclick = () => {
     music.play();
-    startBtn.style.display = "none";
+    startBtn.classList.add("hidden");
+    socket.emit('start_game');
+    setUI(slowSettings)
+};
+
+toLobbyBtn.onclick = () => {
+    startBtn.classList.remove("hidden");
+    toLobbyBtn.classList.add("hidden");
+    setUI(lobbySettings)
 };
 
 socket.on("speed_update", (data) => {
     music.playbackRate = data.speed;
-    speedDisplay.innerText =
-        data.speed > 1 ? fastSettings.text : slowSettings.text;
-
-    document.body.style.backgroundColor =
-        data.speed > 1 ? fastSettings.color : slowSettings.color;
+    if (data.speed > 1) {
+        setUI(fastSettings)
+    } else {
+        setUI(slowSettings)
+    }
 });
 
-socket.on("update_player_list", (players) => {
-    const container = document.getElementById("active-players");
-    container.innerHTML = Object.values(players)
+socket.on("update_player_list", ({ lobbyPlayers, gamePlayers }) => {
+    updatePlayersList(lobbyPlayerList, lobbyPlayers)
+    updatePlayersList(gamePlayerList, gamePlayers)
+});
+
+socket.on("winner_announced", (data) => {
+    music.pause()
+    music.currentTime = 0
+    setUI(getWinnerSettings(data.name))
+    toLobbyBtn.classList.remove("hidden")
+});
+
+function setUI(settings) {
+    header.innerText = settings.text
+    document.body.style.backgroundColor = settings.color
+}
+
+function updatePlayersList(listHTML, players) {
+    listHTML.innerHTML = players
         .map((p) => `<div class="${p.status}">${p.name} - ${p.status}</div>`)
         .join("");
-});
+}
+
+function getWinnerSettings(winnerName) {
+    return {
+        text: `Game is over! Winner is: ${winnerName}`,
+        color: "#118811",
+    };
+}
