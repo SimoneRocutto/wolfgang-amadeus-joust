@@ -132,11 +132,16 @@ function initGame() {
 
 function checkWinner() {
     const alivePlayers = Object.values(players).filter(p => p.status === 'alive');
-    if (alivePlayers.length === 1 && Object.keys(players).length > 1) {
-        io.emit('winner_announced', alivePlayers[0]);
-        console.log(`🏆 Winner: ${alivePlayers[0].name}`);
-        endGame()
+
+    const nobody = {
+        id: null,
+        name: "nobody",
+        status: "alive"
     }
+    let winner = alivePlayers.length === 0 ? nobody : alivePlayers[0];
+    io.emit('winner_announced', winner);
+    console.log(`🏆 Winner: ${winner.name}`);
+    endGame()
 }
 
 function endGame() {
