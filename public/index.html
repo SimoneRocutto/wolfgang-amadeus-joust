@@ -1,29 +1,34 @@
 <!DOCTYPE html>
 <html lang="it">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <title>Joust Clone</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
-
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Joust Clone</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
     <div id="login-screen">
-        <h1>Joust WiFi</h1>
-        <input type="text" id="username" placeholder="Nome Giocatore" maxlength="10">
-        <button id="join-btn">ENTRA IN GIOCO</button>
-        <p class="small">Assicurati di essere in HTTPS</p>
+      <h1>Joust WiFi</h1>
+      <input
+        type="text"
+        id="username"
+        placeholder="Nome Giocatore"
+        maxlength="10"
+      />
+      <button id="join-btn">JOIN GAME</button>
     </div>
 
     <div id="game-screen" class="hidden">
-        <div id="status-indicator">VIVO</div>
-        <div id="debug-info">G: 0.0</div> </div>
+      <div id="status-indicator">ALIVE</div>
+      <div id="debug-info">G: 0.0</div>
+    </div>
 
     <div id="dashboard">
-        <h3>Giocatori in partita:</h3>
-        <ul id="player-list"></ul>
+      <h3>In game players:</h3>
+      <ul id="player-list"></ul>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="client.js"></script>
-</body>
+  </body>
 </html>
