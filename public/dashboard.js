@@ -53,7 +53,7 @@ socket.on("speed_update", (data) => {
 });
 
 socket.on("update_player_list", ({ lobbyPlayers, gamePlayers }) => {
-    updatePlayersList(lobbyPlayerList, lobbyPlayers, false)
+    updatePlayersList(lobbyPlayerList, lobbyPlayers)
     updatePlayersList(gamePlayerList, gamePlayers)
 });
 
@@ -80,7 +80,7 @@ function setUI(settings) {
     document.body.classList.add(settings.class)
 }
 
-function updatePlayersList(listHTML, players, showStatus = true) {
+function updatePlayersList(listHTML, players) {
     listHTML.innerHTML = players
         .map((p) => `<div class="player-item ${p.status}">${p.name}</div>`)
         .join("");

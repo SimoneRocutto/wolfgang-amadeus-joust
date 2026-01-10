@@ -16,6 +16,7 @@ let wakeLock = null;
 requestWakeLock();
 
 let isAlive = true;
+let toLobbyTimeout;
 
 joinBtn.addEventListener('click', () => {
     const name = userInp.value || 'Player';
@@ -38,8 +39,9 @@ function joinLobby(name) {
 }
 
 function startGame(name) {
+    // Avoid going to Lobby right after game start
+    clearTimeout(toLobbyTimeout)
     lobbyScreen.classList.add('hidden');
-    loginScreen.classList.add('hidden');
     gameScreen.classList.remove('hidden');
     setUI(false)
     window.addEventListener('devicemotion', handleMotion);
@@ -64,14 +66,20 @@ socket.on('game_over', () => {
     if (!isAlive) return;
 
     setUI(true)
-
     deathSound.play();
-
     window.removeEventListener('devicemotion', handleMotion);
 
     if (window.navigator.vibrate) {
         window.navigator.vibrate([200, 100, 200]); // Vibra-Pausa-Vibra
     }
+});
+
+socket.on('winner_announced', () => {
+    toLobbyTimeout = setTimeout(() => {
+        gameScreen.classList.add('hidden');
+        document.body.classList.remove('dead', 'alive');
+        lobbyScreen.classList.remove('hidden');
+    }, 3000)
 });
 
 socket.on('update_player_list', ({ lobbyPlayers, gamePlayers }) => {
