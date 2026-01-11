@@ -22,20 +22,47 @@ app.get('/dashboard', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
 });
 
-const SPEED_SLOW = 1.0;
-const SPEED_FAST = 2.0;
-const THRESHOLD_SLOW = 12;
-const THRESHOLD_FAST = 20;
+const slowSettings = {
+    name: "Slow",
+    musicSpeed: 1.0,
+    threshold: 12,
+    // Used when transitioning
+    currentThreshold: 12,
+    changeProbability: 0.25,
+    changeTransition: 0,
+    changeTo: "fast"
+}
+
+const fastSettings = {
+    name: "Fast",
+    musicSpeed: 2.0,
+    threshold: 20,
+    // Used when transitioning
+    currentThreshold: 20,
+    changeProbability: 0.33,
+    // When changing from fast to slow, give players 1 sec of
+    // tolerance
+    changeTransition: 1000,
+    changeTo: "slow"
+}
+
+const allSettings = {
+    slow: slowSettings,
+    fast: fastSettings
+}
 
 let players = {};
 let interval;
-let currentThreshold = THRESHOLD_SLOW;
+let currentSettings = slowSettings;
+let speedTransitionTimeout;
+let gameRunning = false;
 
 io.on('connection', (socket) => {
     console.log(`New connection: ${socket.id}`);
 
     // Dashboard logic
     socket.on('start_game', () => {
+        if (gameRunning) { return; }
         console.log("Game start!")
         io.emit('start_game')
         initGame()
@@ -61,8 +88,8 @@ io.on('connection', (socket) => {
         const player = players[socket.id];
         if (!player || player.status === 'dead') return;
 
-        if (data.intensity > currentThreshold) {
-            console.log(`💀 ${player.name} DEAD (Movement: ${data.intensity.toFixed(2)} > Threshold: ${currentThreshold.toFixed(2)})`);
+        if (data.intensity > currentSettings.currentThreshold) {
+            console.log(`💀 ${player.name} DEAD (Movement: ${data.intensity.toFixed(2)} > Threshold: ${currentSettings.currentThreshold.toFixed(2)})`);
 
             player.status = 'dead';
             socket.emit('game_over');
@@ -76,7 +103,8 @@ io.on('connection', (socket) => {
     socket.on('disconnect', () => {
         console.log(`Disconnection: ${socket.id}`);
         delete players[socket.id];
-        emitPlayers()
+        emitPlayers();
+        checkWinner();
     });
 });
 
@@ -91,10 +119,7 @@ server.listen(PORT, '0.0.0.0', () => {
 });
 
 function initGame() {
-    let gameSpeed = 1.0;
-
-    // Status initialization
-    gameSpeed = SPEED_SLOW;
+    gameRunning = true;
 
     initPlayers()
 
@@ -102,43 +127,48 @@ function initGame() {
     interval = setInterval(() => {
         let hasChanged = false;
 
-        if (gameSpeed === SPEED_SLOW) {
-            if (Math.random() < 0.25) {
-                gameSpeed = SPEED_FAST;
-                currentThreshold = THRESHOLD_FAST;
-                hasChanged = true;
+        if (Math.random() < currentSettings.changeProbability) {
+            // Handle transition
+            const { changeTransition, currentThreshold } = currentSettings;
+            currentSettings = { ...(allSettings[currentSettings.changeTo]) };
+            if (changeTransition > 0) {
+                currentSettings.currentThreshold = currentThreshold;
+                console.log(`Tranistioning: keeping threshold at ${currentThreshold} for ${changeTransition}ms`)
+                speedTransitionTimeout = setTimeout(() => {
+                    currentSettings.currentThreshold = currentSettings.threshold;
+                    console.log(`Transitioning ended: threshold at ${currentSettings.threshold}`)
+                }, changeTransition)
             }
-        } else {
-            if (Math.random() < 0.33) {
-                gameSpeed = SPEED_SLOW;
-                currentThreshold = THRESHOLD_SLOW;
-                hasChanged = true;
-            }
+            hasChanged = true;
         }
 
         if (hasChanged) {
             // Update dashboard (speed) and phones (threshold)
             io.emit('speed_update', {
-                speed: gameSpeed,
-                threshold: currentThreshold
+                speed: currentSettings.musicSpeed,
+                threshold: currentSettings.threshold
             });
 
-            console.log(`>>> RYTHM CHANGE! Speed: ${gameSpeed}x | Threshold: ${currentThreshold}`);
+            console.log(`>>> RYTHM CHANGE! Speed: ${currentSettings.musicSpeed}x | Threshold: ${currentSettings.threshold}`);
         } else {
-            console.log(`Rhythm unvaried (${gameSpeed === SPEED_SLOW ? 'Slow' : 'Fast'})`);
+            console.log(`Rhythm unvaried (${currentSettings.name})`);
         }
     }, 5000);
 }
 
 function checkWinner() {
+    if (!gameRunning) { return; }
+
     const alivePlayers = Object.values(players).filter(p => p.status === 'alive');
+
+    if (alivePlayers.length > 1) { return; }
 
     const nobody = {
         id: null,
         name: "nobody",
         status: "alive"
     }
-    let winner = alivePlayers.length === 0 ? nobody : alivePlayers[0];
+    let winner = alivePlayers?.[0] ?? nobody;
     io.emit('winner_announced', winner);
     console.log(`🏆 Winner: ${winner.name}`);
     endGame()
@@ -146,7 +176,9 @@ function checkWinner() {
 
 function endGame() {
     clearInterval(interval)
+    clearTimeout(speedTransitionTimeout)
     resetPlayerStatus()
+    gameRunning = false;
 }
 
 function initPlayers() {

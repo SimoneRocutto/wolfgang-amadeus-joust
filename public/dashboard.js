@@ -39,6 +39,7 @@ startBtn.onclick = () => {
     const selectedSong = playlist[randomIndex];
 
     music = new Audio(`/assets/sounds/background_music/${selectedSong}`);
+    music.loop = true;
     music.type = 'audio/mpeg';
 
     music.play();
