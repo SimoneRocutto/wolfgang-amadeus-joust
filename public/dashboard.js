@@ -26,6 +26,7 @@ const fastSettings = {
 };
 
 let music;
+let currentScreen = "lobby";
 
 setUI(lobbySettings)
 
@@ -45,6 +46,7 @@ startBtn.onclick = () => {
     music.play();
     startBtn.classList.add("hidden");
     socket.emit('start_game');
+    currentScreen = 'game';
     setUI(slowSettings)
 };
 
@@ -52,6 +54,7 @@ toLobbyBtn.onclick = () => {
     startBtn.classList.remove("hidden");
     toLobbyBtn.classList.add("hidden");
     setUI(lobbySettings)
+    currentScreen = "lobby";
     socket.emit('dashboard_load')
 };
 
@@ -67,6 +70,10 @@ socket.on("speed_update", (data) => {
 });
 
 socket.on("update_player_list", ({ lobbyPlayers, gamePlayers }) => {
+    // Do not update players status during the final screen (otherwise
+    // we would see people with lobby status instead of alive/dead).
+    if (currentScreen === "winner") return;
+
     updatePlayersList(lobbyPlayerList, lobbyPlayers)
     updatePlayersList(gamePlayerList, gamePlayers)
 });
@@ -75,6 +82,7 @@ socket.on("winner_announced", (data) => {
     music.pause()
     music.currentTime = 0
     setUI(getWinnerSettings(data.name))
+    currentScreen = "winner"
     toLobbyBtn.classList.remove("hidden")
 });
 
@@ -89,7 +97,6 @@ let qrcode = new QRCode(document.getElementById("qrcode"), {
 
 function setUI(settings) {
     header.innerText = settings.text
-    // document.body.style.backgroundColor = settings.color
     document.body.classList.remove("lobby", "slow-music", "fast-music", "winner")
     document.body.classList.add(settings.class)
 }

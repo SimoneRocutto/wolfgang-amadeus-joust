@@ -86,7 +86,7 @@ io.on('connection', (socket) => {
 
     socket.on('motion_data', (data) => {
         const player = players[socket.id];
-        if (!player || player.status === 'dead') return;
+        if (!player || player.status === 'dead' || !gameRunning) return;
 
         if (data.intensity > currentSettings.currentThreshold) {
             console.log(`💀 ${player.name} DEAD (Movement: ${data.intensity.toFixed(2)} > Threshold: ${currentSettings.currentThreshold.toFixed(2)})`);

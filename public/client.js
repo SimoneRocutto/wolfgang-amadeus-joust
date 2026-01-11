@@ -13,6 +13,9 @@ const gyroMissingText = document.getElementById('acceleration-missing');
 
 const deathSound = new Audio('assets/sounds/sfx/glass_break.mp3');
 
+// Useful for testing
+const bypassGyroCheck = false;
+
 let wakeLock = null;
 requestWakeLock();
 
@@ -88,7 +91,7 @@ function handleMotion(event) {
 
 function checkGyro(event) {
     const acc = event.accelerationIncludingGravity || event.acceleration;
-    if (!acc || acc.x == null) {
+    if (!bypassGyroCheck && (!acc || acc.x == null)) {
         gyroMissingText.classList.remove('hidden')
         loginScreen.classList.add('hidden');
     } else {
