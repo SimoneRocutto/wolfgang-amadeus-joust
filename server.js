@@ -92,7 +92,6 @@ server.listen(PORT, '0.0.0.0', () => {
 
 function initGame() {
     let gameSpeed = 1.0;
-    let currentThreshold = THRESHOLD_SLOW;
 
     // Status initialization
     gameSpeed = SPEED_SLOW;
