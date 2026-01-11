@@ -9,17 +9,21 @@ const userInp = document.getElementById('username');
 const joinBtn = document.getElementById('join-btn');
 const lobbyPlayerList = document.getElementById('lobby-player-list');
 const gamePlayerList = document.getElementById('game-player-list');
+const gyroMissingText = document.getElementById('acceleration-missing');
 
 const deathSound = new Audio('assets/sounds/sfx/glass_break.mp3');
 
 let wakeLock = null;
 requestWakeLock();
 
+let gameRunning = false;
 let isAlive = true;
 let toLobbyTimeout;
+let joiningLobby = false;
+let playerName = "Player";
 
 joinBtn.addEventListener('click', () => {
-    const name = userInp.value || 'Player';
+    playerName = userInp.value || 'Player';
 
     // UNLOCK AUDIO: On mobile devices, audio must be first enabled by the user
     deathSound.play().then(() => {
@@ -27,28 +31,52 @@ joinBtn.addEventListener('click', () => {
         deathSound.currentTime = 0;
     }).catch(e => console.log("Audio waiting for interaction"));
 
-    // Todo: add "shake to enter" => we make sure no player can enter unless they prove they
-    // can die during the game
-    joinLobby(name);
+    askPermission();
 });
 
-function joinLobby(name) {
+function tryJoiningLobby() {
+    joiningLobby = true;
+    window.addEventListener('devicemotion', handleMotion);
+}
+
+function joinLobby() {
+    joiningLobby = false;
     loginScreen.classList.add('hidden');
     lobbyScreen.classList.remove('hidden');
-    socket.emit('join_lobby', { name: name });
+    socket.emit('join_lobby', { name: playerName });
 }
 
 function startGame(name) {
     // Avoid going to Lobby right after game start
-    clearTimeout(toLobbyTimeout)
+    gameRunning = true;
+    clearTimeout(toLobbyTimeout);
     lobbyScreen.classList.add('hidden');
     gameScreen.classList.remove('hidden');
-    setUI(false)
-    window.addEventListener('devicemotion', handleMotion);
+    setUI(false);
+}
+
+// Test if this works on safari
+function askPermission() {
+    if (typeof DeviceMotionEvent.requestPermission === "function") {
+        DeviceOrientationEvent.requestPermission()
+            .then(response => {
+                if (response == "granted") {
+                    tryJoiningLobby();
+                }
+            })
+            .catch(console.error);
+    } else {
+        tryJoiningLobby();
+    }
 }
 
 function handleMotion(event) {
-    if (!isAlive) return;
+    if (joiningLobby) {
+        checkGyro(event);
+        return;
+    }
+
+    if (!isAlive || !gameRunning) return;
     const acc = event.accelerationIncludingGravity || event.acceleration;
     if (!acc || acc.x === null) return;
 
@@ -56,6 +84,18 @@ function handleMotion(event) {
     debugDiv.innerText = `Force: ${intensity.toFixed(2)}`;
 
     socket.emit('motion_data', { intensity: intensity });
+}
+
+function checkGyro(event) {
+    const acc = event.accelerationIncludingGravity || event.acceleration;
+    if (!acc || acc.x == null) {
+        gyroMissingText.classList.remove('hidden')
+        loginScreen.classList.add('hidden');
+    } else {
+        gyroMissingText.classList.add('hidden')
+        joiningLobby = false;
+        joinLobby();
+    }
 }
 
 socket.on('start_game', () => {
@@ -67,10 +107,9 @@ socket.on('game_over', () => {
 
     setUI(true)
     playDeathSfx()
-    window.removeEventListener('devicemotion', handleMotion);
 
     if (window.navigator.vibrate) {
-        window.navigator.vibrate([200, 100, 200]); // Vibra-Pausa-Vibra
+        window.navigator.vibrate([200, 100, 200]); // Vibration-Pause-Vibration
     }
 });
 
@@ -80,13 +119,8 @@ socket.on('winner_announced', () => {
         gameScreen.classList.add('hidden');
         document.body.classList.remove('dead', 'alive');
         lobbyScreen.classList.remove('hidden');
+        gameRunning = false;
     }, 3000)
-});
-
-socket.on('update_player_list', ({ lobbyPlayers, gamePlayers }) => {
-    console.log(lobbyPlayers)
-    updatePlayersList(lobbyPlayerList, lobbyPlayers)
-    updatePlayersList(gamePlayerList, gamePlayers)
 });
 
 document.addEventListener('visibilitychange', async () => {
@@ -94,16 +128,6 @@ document.addEventListener('visibilitychange', async () => {
         await requestWakeLock();
     }
 });
-
-// Player list on client page has been removed in favor of simpler UI
-function updatePlayersList(listHTML, players) {
-    // listHTML.innerHTML = '';
-    // players.forEach(p => {
-    //     const li = document.createElement('li');
-    //     li.innerHTML = `<span>${p.name}</span> <span class="status-${p.status}">${p.status.toUpperCase()}</span>`;
-    //     listHTML.appendChild(li);
-    // });
-}
 
 function setUI(isDead) {
     isAlive = !isDead;

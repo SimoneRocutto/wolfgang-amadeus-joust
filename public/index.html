@@ -117,7 +117,7 @@
       }
 
       /* Lobby Screen */
-      #lobby-screen {
+      .white-box {
         background: white;
         border-radius: 24px;
         padding: 48px 32px;
@@ -128,11 +128,15 @@
         animation: slideIn 0.5s ease-out;
       }
 
-      #lobby-screen h1 {
+      .white-box h1 {
         font-size: 2rem;
         color: #333;
         margin-bottom: 24px;
         font-weight: 700;
+      }
+
+      .white-box h3 {
+        font-weight: 400;
       }
 
       #lobby-screen::after {
@@ -250,7 +254,15 @@
       <button id="join-btn">Join Game</button>
     </div>
 
-    <div id="lobby-screen" class="hidden">
+    <div id="acceleration-missing" class="white-box hidden">
+      <h1>Brave user?</h1>
+      <h3>
+        In order to play, enable motion sensors by going to
+        <strong>Settings -> Site settings -> Motion sensors</strong>
+      </h3>
+    </div>
+
+    <div id="lobby-screen" class="white-box hidden">
       <h1>In Lobby</h1>
     </div>
 
