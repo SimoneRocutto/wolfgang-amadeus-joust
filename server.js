@@ -1,215 +1,318 @@
-const fs = require('fs');
-const https = require('https');
-const express = require('express');
-const socketIo = require('socket.io');
-const path = require('path');
+import fs from "fs";
+import https from "https";
+import express from "express";
+import { Server } from "socket.io";
+import path from "path";
+import { fileURLToPath } from "url";
 
-// SSL config
-const options = {
-    key: fs.readFileSync(path.join(__dirname, 'certs', 'key.pem')),
-    cert: fs.readFileSync(path.join(__dirname, 'certs', 'cert.pem'))
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// ============================================================================
+// CONFIGURATION
+// ============================================================================
+
+const PORT = 3000;
+
+const SSL_OPTIONS = {
+  key: fs.readFileSync(path.join(__dirname, "certs", "key.pem")),
+  cert: fs.readFileSync(path.join(__dirname, "certs", "cert.pem")),
 };
 
-// App init
-const app = express();
-const server = https.createServer(options, app);
-const io = socketIo(server);
-
-// Serving public files
-app.use(express.static(path.join(__dirname, 'public')));
-
-app.get('/dashboard', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
-});
-
-const slowSettings = {
+const GAME_MODES = {
+  slow: {
     name: "Slow",
     musicSpeed: 1.0,
     threshold: 12,
-    // Used when transitioning
     currentThreshold: 12,
     changeProbability: 0.25,
     changeTransition: 0,
-    changeTo: "fast"
-}
-
-const fastSettings = {
+    changeTo: "fast",
+  },
+  fast: {
     name: "Fast",
     musicSpeed: 2.0,
     threshold: 20,
-    // Used when transitioning
     currentThreshold: 20,
     changeProbability: 0.33,
-    // When changing from fast to slow, give players 1 sec of
-    // tolerance
     changeTransition: 1000,
-    changeTo: "slow"
-}
+    changeTo: "slow",
+  },
+};
 
-const allSettings = {
-    slow: slowSettings,
-    fast: fastSettings
-}
+const RHYTHM_CHECK_INTERVAL = 5000;
 
-let players = {};
-let interval;
-let currentSettings = slowSettings;
-let speedTransitionTimeout;
-let gameRunning = false;
+// ============================================================================
+// SERVER SETUP
+// ============================================================================
 
-io.on('connection', (socket) => {
-    console.log(`New connection: ${socket.id}`);
+const app = express();
+const server = https.createServer(SSL_OPTIONS, app);
+const io = new Server(server);
 
-    // Dashboard logic
-    socket.on('start_game', () => {
-        if (gameRunning) { return; }
-        console.log("Game start!")
-        io.emit('start_game')
-        initGame()
-    })
+app.use(express.static(path.join(__dirname, "public")));
 
-    socket.on('dashboard_load', () => {
-        emitPlayers()
-    })
-
-    // Players logic
-    socket.on('join_lobby', (data) => {
-        players[socket.id] = {
-            id: socket.id,
-            name: data.name || `Player ${socket.id.substr(0, 4)}`,
-            status: 'lobby'
-        };
-        console.log(`${players[socket.id].name} joined the lobby!`);
-
-        emitPlayers()
-    });
-
-    socket.on('motion_data', (data) => {
-        const player = players[socket.id];
-        if (!player || player.status === 'dead' || !gameRunning) return;
-
-        if (data.intensity > currentSettings.currentThreshold) {
-            console.log(`💀 ${player.name} DEAD (Movement: ${data.intensity.toFixed(2)} > Threshold: ${currentSettings.currentThreshold.toFixed(2)})`);
-
-            player.status = 'dead';
-            socket.emit('game_over');
-            emitPlayers()
-
-            checkWinner();
-        }
-
-    });
-
-    socket.on('disconnect', () => {
-        console.log(`Disconnection: ${socket.id}`);
-        delete players[socket.id];
-        emitPlayers();
-        checkWinner();
-    });
+app.get("/dashboard", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "dashboard.html"));
 });
 
-// Start server on every interface (0.0.0.0) to be visible on WiFi
-const PORT = 3000;
-server.listen(PORT, '0.0.0.0', () => {
-    console.log(`\n--- SERVER STARTED ---`);
-    console.log(`To connect with your phone`);
-    console.log(`1. Make sure both the server machine and phone are on the same WiFi`);
-    console.log(`2. Go to : https://YOUR_LOCAL_IP:${PORT}`);
-    console.log(`----------------------\n`);
-});
+// ============================================================================
+// GAME STATE
+// ============================================================================
 
-function initGame() {
-    gameRunning = true;
+class GameState {
+  constructor() {
+    this.players = {};
+    this.gameRunning = false;
+    this.currentMode = GAME_MODES.slow;
+    this.rhythmInterval = null;
+    this.transitionTimeout = null;
+  }
 
-    initPlayers()
+  addPlayer(socketId, name) {
+    this.players[socketId] = {
+      id: socketId,
+      name: name || `Player ${socketId.substr(0, 4)}`,
+      status: "lobby",
+    };
+    console.log(`✅ ${this.players[socketId].name} joined the lobby`);
+  }
 
-    // Change rythm logic
-    interval = setInterval(() => {
-        let hasChanged = false;
-
-        if (Math.random() < currentSettings.changeProbability) {
-            // Handle transition
-            const { changeTransition, currentThreshold } = currentSettings;
-            currentSettings = { ...(allSettings[currentSettings.changeTo]) };
-            if (changeTransition > 0) {
-                currentSettings.currentThreshold = currentThreshold;
-                console.log(`Tranistioning: keeping threshold at ${currentThreshold} for ${changeTransition}ms`)
-                speedTransitionTimeout = setTimeout(() => {
-                    currentSettings.currentThreshold = currentSettings.threshold;
-                    console.log(`Transitioning ended: threshold at ${currentSettings.threshold}`)
-                }, changeTransition)
-            }
-            hasChanged = true;
-        }
-
-        if (hasChanged) {
-            // Update dashboard (speed) and phones (threshold)
-            io.emit('speed_update', {
-                speed: currentSettings.musicSpeed,
-                threshold: currentSettings.threshold
-            });
-
-            console.log(`>>> RYTHM CHANGE! Speed: ${currentSettings.musicSpeed}x | Threshold: ${currentSettings.threshold}`);
-        } else {
-            console.log(`Rhythm unvaried (${currentSettings.name})`);
-        }
-    }, 5000);
-}
-
-function checkWinner() {
-    if (!gameRunning) { return; }
-
-    const alivePlayers = Object.values(players).filter(p => p.status === 'alive');
-
-    if (alivePlayers.length > 1) { return; }
-
-    const nobody = {
-        id: null,
-        name: "nobody",
-        status: "alive"
+  removePlayer(socketId) {
+    const player = this.players[socketId];
+    if (player) {
+      console.log(`❌ ${player.name} disconnected`);
+      delete this.players[socketId];
     }
-    let winner = alivePlayers?.[0] ?? nobody;
-    io.emit('winner_announced', winner);
+  }
+
+  getPlayer(socketId) {
+    return this.players[socketId];
+  }
+
+  getAllPlayers() {
+    return Object.values(this.players);
+  }
+
+  getPlayersByStatus(...statuses) {
+    return this.getAllPlayers().filter((p) => statuses.includes(p.status));
+  }
+
+  getLobbyPlayers() {
+    return this.getPlayersByStatus("lobby");
+  }
+
+  getAlivePlayers() {
+    return this.getPlayersByStatus("alive");
+  }
+
+  getGamePlayers() {
+    return this.getPlayersByStatus("alive", "dead");
+  }
+
+  killPlayer(socketId) {
+    const player = this.players[socketId];
+    if (player) {
+      player.status = "dead";
+    }
+  }
+
+  startGame() {
+    if (this.gameRunning) return false;
+
+    this.gameRunning = true;
+    this.currentMode = GAME_MODES.slow;
+
+    this.getLobbyPlayers().forEach((player) => {
+      player.status = "alive";
+    });
+
+    console.log("🎮 Game started!");
+    return true;
+  }
+
+  endGame() {
+    this.gameRunning = false;
+    this.stopRhythmChanges();
+
+    this.getGamePlayers().forEach((player) => {
+      player.status = "lobby";
+    });
+
+    console.log("🏁 Game ended");
+  }
+
+  startRhythmChanges() {
+    this.rhythmInterval = setInterval(() => {
+      this.attemptRhythmChange();
+    }, RHYTHM_CHECK_INTERVAL);
+  }
+
+  stopRhythmChanges() {
+    if (this.rhythmInterval) {
+      clearInterval(this.rhythmInterval);
+      this.rhythmInterval = null;
+    }
+    if (this.transitionTimeout) {
+      clearTimeout(this.transitionTimeout);
+      this.transitionTimeout = null;
+    }
+  }
+
+  attemptRhythmChange() {
+    const shouldChange = Math.random() < this.currentMode.changeProbability;
+
+    if (shouldChange) {
+      const previousThreshold = this.currentMode.currentThreshold;
+      const transition = this.currentMode.changeTransition;
+      const nextModeName = this.currentMode.changeTo;
+
+      this.currentMode = { ...GAME_MODES[nextModeName] };
+
+      if (transition > 0) {
+        this.currentMode.currentThreshold = previousThreshold;
+        console.log(
+          `🔄 Transitioning: keeping threshold at ${previousThreshold} for ${transition}ms`
+        );
+
+        this.transitionTimeout = setTimeout(() => {
+          this.currentMode.currentThreshold = this.currentMode.threshold;
+          console.log(
+            `✅ Transition complete: threshold now ${this.currentMode.threshold}`
+          );
+        }, transition);
+      }
+
+      console.log(
+        `🎵 RHYTHM CHANGE! Speed: ${this.currentMode.musicSpeed}x | Threshold: ${this.currentMode.threshold}`
+      );
+      return true;
+    }
+
+    console.log(`⏸️  Rhythm unchanged (${this.currentMode.name})`);
+    return false;
+  }
+
+  checkForWinner() {
+    if (!this.gameRunning) return null;
+
+    const alivePlayers = this.getAlivePlayers();
+
+    if (alivePlayers.length > 1) return null;
+
+    const winner = alivePlayers[0] || {
+      id: null,
+      name: "nobody",
+      status: "alive",
+    };
+
     console.log(`🏆 Winner: ${winner.name}`);
-    endGame()
+    return winner;
+  }
 }
 
-function endGame() {
-    clearInterval(interval)
-    clearTimeout(speedTransitionTimeout)
-    resetPlayerStatus()
-    gameRunning = false;
-}
+// ============================================================================
+// GAME INSTANCE
+// ============================================================================
 
-function initPlayers() {
-    for (const player of getLobbyPlayers()) {
-        player.status = "alive"
+const game = new GameState();
+
+// ============================================================================
+// SOCKET EVENT HANDLERS
+// ============================================================================
+
+io.on("connection", (socket) => {
+  console.log(`🔌 New connection: ${socket.id}`);
+
+  socket.on("start_game", () => {
+    if (game.startGame()) {
+      io.emit("start_game");
+      game.startRhythmChanges();
+      broadcastPlayerList();
+    }
+  });
+
+  socket.on("dashboard_load", () => {
+    broadcastPlayerList();
+  });
+
+  socket.on("join_lobby", (data) => {
+    game.addPlayer(socket.id, data.name);
+    broadcastPlayerList();
+  });
+
+  socket.on("motion_data", (data) => {
+    const player = game.getPlayer(socket.id);
+
+    if (!player || player.status === "dead" || !game.gameRunning) {
+      return;
     }
 
-    emitPlayers()
+    if (data.intensity > game.currentMode.currentThreshold) {
+      console.log(
+        `💀 ${player.name} DEAD ` +
+          `(Movement: ${data.intensity.toFixed(2)} > ` +
+          `Threshold: ${game.currentMode.currentThreshold.toFixed(2)})`
+      );
 
-    return players
-}
+      game.killPlayer(socket.id);
+      socket.emit("game_over");
+      broadcastPlayerList();
 
-function resetPlayerStatus() {
-    for (const player of getNonLobbyPlayers()) {
-        console.log(player)
-        player.status = "lobby"
+      const winner = game.checkForWinner();
+      if (winner) {
+        io.emit("winner_announced", winner);
+        game.endGame();
+      }
     }
+  });
+
+  socket.on("disconnect", () => {
+    game.removePlayer(socket.id);
+    broadcastPlayerList();
+
+    const winner = game.checkForWinner();
+    if (winner) {
+      io.emit("winner_announced", winner);
+      game.endGame();
+    }
+  });
+});
+
+// Override startRhythmChanges to broadcast changes
+game.startRhythmChanges = function () {
+  this.rhythmInterval = setInterval(() => {
+    if (this.attemptRhythmChange()) {
+      io.emit("speed_update", {
+        speed: this.currentMode.musicSpeed,
+        threshold: this.currentMode.threshold,
+      });
+    }
+  }, RHYTHM_CHECK_INTERVAL);
+};
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+function broadcastPlayerList() {
+  io.emit("update_player_list", {
+    lobbyPlayers: game.getLobbyPlayers(),
+    gamePlayers: game.getGamePlayers(),
+  });
 }
 
-function getLobbyPlayers() {
-    return getPlayersByStatus(["lobby"])
-}
+// ============================================================================
+// START SERVER
+// ============================================================================
 
-function getNonLobbyPlayers() {
-    return getPlayersByStatus(["alive", "dead"])
-}
-
-function getPlayersByStatus(statusArr) {
-    return Object.values(players).filter((p) => statusArr.includes(p.status))
-}
-
-function emitPlayers() {
-    io.emit('update_player_list', { lobbyPlayers: getLobbyPlayers(), gamePlayers: getNonLobbyPlayers() });
-}
+server.listen(PORT, "0.0.0.0", () => {
+  console.log("\n" + "=".repeat(50));
+  console.log("🎮 WOLFGANG AMADEUS JOUST SERVER");
+  console.log("=".repeat(50));
+  console.log(`📡 Server running on port ${PORT}`);
+  console.log(`🌐 To connect with your phone:`);
+  console.log(`   1. Ensure both server and phone are on same WiFi`);
+  console.log(`   2. Go to: https://YOUR_LOCAL_IP:${PORT}`);
+  console.log("=".repeat(50) + "\n");
+});
